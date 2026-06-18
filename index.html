@@ -373,13 +373,12 @@
 <script>
 /* ==========================================================
    GitHub API 云端数据库配置区
-   ⚠️ 请将下面 4 个变量替换为你自己的信息！
+   ⚠️ 请填入你的用户名和仓库名，无需填入 Token (Token 在后台登录时输入)
    ========================================================== */
-const REPO_OWNER   = 'YGPTDR-web';
-const REPO_NAME    = 'json-db';
-const FILE_PATH    = 'db.json';
-let GITHUB_TOKEN = ''; // 运行时从输入框获取，不硬编码在代码里
-
+const REPO_OWNER   = '这里替换为你的GitHub用户名';     // 你的 GitHub 用户名
+const REPO_NAME    = '这里替换为你的数据仓库名';       // 你放 db.json 的公开仓库名
+const FILE_PATH    = 'db.json';                        // 仓庛建的文件名
+let GITHUB_TOKEN = ''; // 运行时从登录框获取，不会写死在代码里
 
 /* ==========================================================
    数据层 & 默认数据
@@ -524,12 +523,13 @@ let DB = null;
 async function loadData(){
   try {
     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-    const res = await fetch(url, {
-      headers: { 
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
+    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    // 如果有 Token (管理员已登录)，则带上 Token 避免读取频率限制
+    if (GITHUB_TOKEN) {
+      headers['Authorization'] = `token ${GITHUB_TOKEN}`;
+    }
+    
+    const res = await fetch(url, { headers });
     if(res.ok) {
       const json = await res.json();
       CURRENT_SHA = json.sha; 
@@ -561,6 +561,13 @@ async function loadData(){
 // 2. 保存数据
 async function saveData(data){
   localStorage.setItem(STORE_KEY, JSON.stringify(data));
+  
+  // 如果没有 Token，说明是普通访客，不执行推送到 GitHub
+  if (!GITHUB_TOKEN) {
+    console.warn('未检测到 Token，数据仅保存在本地浏览器。');
+    return;
+  }
+  
   try {
     const encodedContent = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
     const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
@@ -1319,6 +1326,9 @@ function renderAdminEditor(worldId){
   });
 }
 
+/* ==========================================================
+   初始化 (异步加载云端数据后渲染)
+   ========================================================== */
 // 尝试从临时缓存恢复 Token（防止刷新页面后失效）
 const cachedToken = sessionStorage.getItem('temp_token');
 if(cachedToken) GITHUB_TOKEN = cachedToken;
@@ -1326,8 +1336,6 @@ if(cachedToken) GITHUB_TOKEN = cachedToken;
 loadData().then(data => {
   DB = data;
   route(); // 数据准备好了，才开始渲染页面
-});
-
 });
 
 </script>
