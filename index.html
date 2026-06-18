@@ -1,33 +1,1352 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Trae Project</title>
-    <script type="module">
-      if (import.meta.hot?.on) {
-        import.meta.hot.on('vite:error', (error) => {
-          if (error.err) {
-            console.error(
-              [error.err.message, error.err.frame].filter(Boolean).join('\n'),
-            )
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>苍穹编年史 · 世界观典籍</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Noto+Serif+SC:wght@400;600;900&family=Manrope:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0f;
+    --bg-2:#12121a;
+    --panel:#16161f;
+    --fg:#f5f0e8;
+    --muted:#8a8478;
+    --accent:#e8b87d;
+    --accent-2:#d4a574;
+    --crimson:#8b3a3a;
+    --border:rgba(232,184,125,0.15);
+    --glow:rgba(232,184,125,0.35);
+  }
+  *{ -webkit-tap-highlight-color:transparent; }
+  html,body{ background:var(--bg); color:var(--fg); font-family:'Manrope','Noto Serif SC',serif; }
+  body{ overflow-x:hidden; }
+  .font-display{ font-family:'Cinzel', serif; letter-spacing:0.05em; }
+  .font-serif-sc{ font-family:'Noto Serif SC', serif; }
+
+  /* 噪点纹理叠加 */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity:0.04; mix-blend-mode:overlay;
+  }
+
+  /* 全局背景光晕 */
+  .ambient{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(900px 600px at 15% 10%, rgba(232,184,125,0.10), transparent 60%),
+      radial-gradient(700px 500px at 85% 90%, rgba(139,58,58,0.10), transparent 60%),
+      radial-gradient(1200px 800px at 50% 50%, rgba(20,18,28,0.6), transparent 70%);
+  }
+  .stars{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:#0a0a0f; }
+  ::-webkit-scrollbar-thumb{ background:linear-gradient(180deg,#3a3328,#1a1614); border-radius:10px; border:2px solid #0a0a0f; }
+  ::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,#5a4a35,#2a2218); }
+
+  /* 通用动画 */
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(30px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes fadeIn{ from{opacity:0;} to{opacity:1;} }
+  @keyframes glow{ 0%,100%{ box-shadow:0 0 30px var(--glow);} 50%{ box-shadow:0 0 60px var(--glow);} }
+  @keyframes shimmer{ 0%{ background-position:-200% 0; } 100%{ background-position:200% 0; } }
+  @keyframes float{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-8px);} }
+  @keyframes rotate{ from{ transform:rotate(0); } to{ transform:rotate(360deg); } }
+  @keyframes scaleIn{ from{ opacity:0; transform:scale(0.9); } to{ opacity:1; transform:scale(1); } }
+  @keyframes slideRight{ from{ opacity:0; transform:translateX(-30px);} to{ opacity:1; transform:translateX(0);} }
+
+  .fade-up{ animation:fadeUp 0.9s cubic-bezier(.2,.7,.2,1) both; }
+  .fade-in{ animation:fadeIn 1s ease both; }
+  .stagger > *{ animation:fadeUp 0.8s cubic-bezier(.2,.7,.2,1) both; }
+  .stagger > *:nth-child(1){ animation-delay:.05s; }
+  .stagger > *:nth-child(2){ animation-delay:.15s; }
+  .stagger > *:nth-child(3){ animation-delay:.25s; }
+  .stagger > *:nth-child(4){ animation-delay:.35s; }
+  .stagger > *:nth-child(5){ animation-delay:.45s; }
+  .stagger > *:nth-child(6){ animation-delay:.55s; }
+
+  /* 世界观卡片 */
+  .world-card{
+    position:relative; cursor:pointer;
+    transition: transform .6s cubic-bezier(.2,.7,.2,1), box-shadow .6s;
+    will-change: transform;
+  }
+  .world-card:hover{ transform: translateY(-8px); }
+  .world-card .cover{
+    position:relative; overflow:hidden;
+    border:1px solid var(--border);
+    background:#0d0d14;
+  }
+  .world-card .cover::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg, transparent 30%, rgba(10,10,15,0.85) 100%);
+  }
+  .world-card .cover img{
+    width:100%; height:100%; object-fit:cover;
+    transition: transform 1.2s cubic-bezier(.2,.7,.2,1), filter .6s;
+    filter:saturate(0.85) brightness(0.85);
+  }
+  .world-card:hover .cover img{ transform:scale(1.08); filter:saturate(1.05) brightness(1); }
+  .world-card .corner{
+    position:absolute; width:24px; height:24px; border:1px solid var(--accent);
+    opacity:0.6; transition:opacity .4s, width .4s, height .4s;
+  }
+  .world-card:hover .corner{ opacity:1; width:32px; height:32px; }
+  .corner.tl{ top:10px; left:10px; border-right:0; border-bottom:0; }
+  .corner.tr{ top:10px; right:10px; border-left:0; border-bottom:0; }
+  .corner.bl{ bottom:10px; left:10px; border-right:0; border-top:0; }
+  .corner.br{ bottom:10px; right:10px; border-left:0; border-top:0; }
+
+  /* 过渡覆盖层 (FLIP 卡片放大) */
+  #transition-overlay{
+    position:fixed; inset:0; z-index:200; pointer-events:none;
+    display:none;
+  }
+  #transition-overlay.active{ display:block; pointer-events:auto; }
+  .trans-pane{
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    transform-origin:0 0;
+    background-size:cover; background-position:center;
+  }
+
+  /* 详情页标签 */
+  .tab-btn{
+    position:relative; padding:.6rem 1.2rem; color:var(--muted);
+    transition: color .4s; font-family:'Cinzel', serif; letter-spacing:0.1em; font-size:.85rem;
+  }
+  .tab-btn::after{
+    content:""; position:absolute; left:50%; bottom:0; width:0; height:1px; background:var(--accent);
+    transition: width .4s, left .4s;
+  }
+  .tab-btn:hover{ color:var(--fg); }
+  .tab-btn.active{ color:var(--accent); }
+  .tab-btn.active::after{ width:60%; left:20%; }
+
+  /* 时间线 */
+  .timeline-rail{ position:relative; }
+  .timeline-rail::before{
+    content:""; position:absolute; left:50%; top:0; bottom:0; width:1px;
+    background:linear-gradient(180deg, transparent, var(--accent) 10%, var(--accent) 90%, transparent);
+    opacity:0.4;
+  }
+  .tl-item{ position:relative; }
+  .tl-dot{
+    position:absolute; left:50%; top:1.5rem; transform:translateX(-50%);
+    width:14px; height:14px; border-radius:50%;
+    background:var(--bg); border:2px solid var(--accent);
+    box-shadow:0 0 0 4px rgba(232,184,125,0.1);
+    transition: all .4s;
+  }
+  .tl-item:hover .tl-dot{
+    background:var(--accent); box-shadow:0 0 0 6px rgba(232,184,125,0.2), 0 0 20px var(--glow);
+    transform:translateX(-50%) scale(1.3);
+  }
+  .tl-card{
+    transition: transform .5s, opacity .5s;
+  }
+  .tl-item:hover .tl-card{ transform:translateY(-4px); }
+
+  /* 派系卡片 */
+  .faction-card{
+    position:relative; overflow:hidden; cursor:pointer;
+    transition: transform .6s cubic-bezier(.2,.7,.2,1);
+    border:1px solid var(--border);
+  }
+  .faction-card::before{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(135deg, var(--fc, var(--crimson)) 0%, transparent 70%);
+    opacity:0.15; transition:opacity .5s;
+  }
+  .faction-card:hover::before{ opacity:0.3; }
+  .faction-card:hover{ transform:translateY(-6px); border-color:var(--fc, var(--accent)); }
+  .faction-card .glyph{
+    transition: transform .8s cubic-bezier(.2,.7,.2,1), color .5s;
+  }
+  .faction-card:hover .glyph{ transform:rotate(360deg) scale(1.1); color:var(--fc); }
+
+  /* 派系详情侧拉抽屉 */
+  #faction-drawer{
+    position:fixed; top:0; right:0; height:100vh; width:min(560px, 92vw);
+    background:linear-gradient(180deg, #12121a, #0a0a0f);
+    border-left:1px solid var(--border);
+    transform:translateX(100%); transition:transform .7s cubic-bezier(.2,.7,.2,1);
+    z-index:150; overflow-y:auto;
+  }
+  #faction-drawer.open{ transform:translateX(0); }
+  #faction-backdrop{
+    position:fixed; inset:0; background:rgba(5,5,10,0.7); backdrop-filter:blur(6px);
+    z-index:140; opacity:0; pointer-events:none; transition:opacity .5s;
+  }
+  #faction-backdrop.open{ opacity:1; pointer-events:auto; }
+
+  /* 角色卡 */
+  .char-card{
+    transition: transform .5s, border-color .5s;
+    border:1px solid var(--border);
+  }
+  .char-card:hover{ transform:translateY(-6px); border-color:var(--accent); }
+  .char-avatar{
+    position:relative; overflow:hidden;
+  }
+  .char-avatar::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg, transparent 40%, rgba(10,10,15,0.95));
+  }
+
+  /* 按钮 */
+  .btn-primary{
+    position:relative; padding:.8rem 2rem; background:transparent;
+    border:1px solid var(--accent); color:var(--accent);
+    font-family:'Cinzel', serif; letter-spacing:0.15em; font-size:.85rem;
+    overflow:hidden; transition:color .4s; cursor:pointer;
+  }
+  .btn-primary::before{
+    content:""; position:absolute; inset:0; background:var(--accent);
+    transform:scaleX(0); transform-origin:left; transition:transform .5s cubic-bezier(.2,.7,.2,1);
+  }
+  .btn-primary:hover{ color:#0a0a0f; }
+  .btn-primary:hover::before{ transform:scaleX(1); }
+  .btn-primary span{ position:relative; z-index:1; }
+
+  .btn-ghost{
+    padding:.6rem 1.4rem; border:1px solid var(--border); color:var(--muted);
+    transition: all .4s; cursor:pointer; font-size:.85rem;
+  }
+  .btn-ghost:hover{ color:var(--fg); border-color:var(--accent); }
+
+  /* 输入框 */
+  .field{
+    background:#0d0d14; border:1px solid var(--border); color:var(--fg);
+    padding:.6rem .9rem; width:100%; transition:border-color .3s, box-shadow .3s;
+    font-family:'Manrope', sans-serif;
+  }
+  .field:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(232,184,125,0.1); }
+  textarea.field{ resize:vertical; min-height:80px; }
+
+  /* 标题装饰线 */
+  .title-line{
+    display:flex; align-items:center; gap:1rem;
+  }
+  .title-line::before, .title-line::after{
+    content:""; flex:1; height:1px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity:0.5;
+  }
+
+  /* Toast */
+  #toast-container{ position:fixed; top:24px; right:24px; z-index:300; display:flex; flex-direction:column; gap:.6rem; }
+  .toast{
+    background:rgba(20,18,28,0.95); border:1px solid var(--accent); color:var(--fg);
+    padding:.8rem 1.2rem; min-width:240px; backdrop-filter:blur(10px);
+    animation: slideRight .4s ease both;
+    box-shadow:0 10px 40px rgba(0,0,0,0.5);
+  }
+
+  /* 巨型背景文字 */
+  .ghost-text{
+    position:absolute; font-family:'Cinzel', serif; font-weight:800;
+    color:transparent; -webkit-text-stroke:1px rgba(232,184,125,0.06);
+    pointer-events:none; user-select:none; white-space:nowrap;
+  }
+
+  /* hero 装饰圈 */
+  .sigil{
+    position:absolute; border:1px solid var(--border); border-radius:50%;
+    animation: rotate 60s linear infinite;
+  }
+  .sigil::before, .sigil::after{
+    content:""; position:absolute; border:1px dashed rgba(232,184,125,0.2); border-radius:50%;
+  }
+
+  /* 卡片浮起阴影 */
+  .elev{ box-shadow:0 20px 50px -20px rgba(0,0,0,0.8); }
+
+  /* page view 切换 */
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* 雷达图容器 */
+  .radar-wrap{ position:relative; aspect-ratio:1; }
+  .radar-wrap::before{
+    content:""; position:absolute; inset:-20px; border-radius:50%;
+    background:radial-gradient(circle, rgba(232,184,125,0.1), transparent 70%);
+    pointer-events:none;
+  }
+
+  /* hover link */
+  .link-u{ position:relative; }
+  .link-u::after{ content:""; position:absolute; left:0; bottom:-2px; width:0; height:1px; background:var(--accent); transition:width .4s; }
+  .link-u:hover::after{ width:100%; }
+
+  /* 可拖拽排序提示 */
+  .drag-handle{ cursor:move; color:var(--muted); }
+  .drag-handle:hover{ color:var(--accent); }
+
+  /* 移动端调整 */
+  @media (max-width: 768px){
+    .timeline-rail::before{ left:20px; }
+    .tl-dot{ left:20px; }
+    .tl-item .tl-card{ margin-left:48px !important; margin-right:0 !important; text-align:left !important; }
+    .tl-item:nth-child(even) .tl-card{ margin-left:48px !important; margin-right:0 !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+<canvas class="stars" id="stars"></canvas>
+
+<!-- 顶部导航 -->
+<nav id="main-nav" class="fixed top-0 left-0 right-0 z-50 transition-all duration-500" style="backdrop-filter:blur(12px); background:rgba(10,10,15,0.4); border-bottom:1px solid var(--border);">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <a href="#/" class="flex items-center gap-3 group">
+      <svg width="28" height="28" viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="18" stroke="#e8b87d" stroke-width="1"/>
+        <circle cx="20" cy="20" r="10" stroke="#e8b87d" stroke-width="1" opacity="0.6"/>
+        <path d="M20 4 L20 36 M4 20 L36 20" stroke="#e8b87d" stroke-width="0.5" opacity="0.4"/>
+        <circle cx="20" cy="20" r="2" fill="#e8b87d"/>
+      </svg>
+      <div>
+        <div class="font-display text-sm tracking-widest" style="color:var(--accent)">AETHERIUM</div>
+        <div class="text-xs" style="color:var(--muted)">苍穹编年史</div>
+      </div>
+    </a>
+    <div class="flex items-center gap-6 text-sm">
+      <a href="#/" class="link-u font-display tracking-widest" style="color:var(--fg)">WORLDS</a>
+      <a href="#/about" class="link-u font-display tracking-widest hidden md:inline" style="color:var(--muted)">CODEX</a>
+      <a href="#/admin" class="btn-ghost font-display tracking-widest">ADMIN</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ============ 主页视图 ============ -->
+<section id="view-home" class="view active">
+  <!-- Hero -->
+  <div class="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+    <div class="ghost-text" style="top:18%; left:-5%; font-size:18vw; opacity:0.5;">AETHER</div>
+    <div class="ghost-text" style="bottom:12%; right:-5%; font-size:14vw; opacity:0.4;">CHRONICLE</div>
+
+    <div class="sigil" style="width:600px; height:600px; top:50%; left:50%; transform:translate(-50%,-50%);"></div>
+    <div class="sigil" style="width:900px; height:900px; top:50%; left:50%; transform:translate(-50%,-50%); animation-duration:120s; animation-direction:reverse;"></div>
+
+    <div class="relative z-10 text-center px-6 max-w-4xl">
+      <div class="fade-up" style="animation-delay:.1s">
+        <div class="title-line mb-8">
+          <span class="font-display text-xs tracking-[0.5em]" style="color:var(--accent)">CODEX OF WORLDS</span>
+        </div>
+      </div>
+      <h1 class="fade-up font-serif-sc font-black leading-none mb-6" style="font-size:clamp(3rem,9vw,7rem); animation-delay:.2s">
+        <span style="background:linear-gradient(180deg, #f5f0e8 30%, #8a7a55 100%); -webkit-background-clip:text; background-clip:text; color:transparent;">苍穹编年史</span>
+      </h1>
+      <p class="fade-up text-lg md:text-xl mb-2 font-serif-sc" style="color:var(--muted); animation-delay:.4s">
+        千世界，万古事，皆载于此
+      </p>
+      <p class="fade-up text-sm mb-12 max-w-xl mx-auto" style="color:var(--muted); animation-delay:.5s">
+        A repository of constructed worlds — their histories, their peoples, their factions, and the threads that bind them.
+      </p>
+      <div class="fade-up flex items-center justify-center gap-4" style="animation-delay:.7s">
+        <a href="#worlds-list" class="btn-primary"><span>EXPLORE WORLDS</span></a>
+        <a href="#/admin" class="btn-ghost font-display tracking-widest">ENTER ADMIN</a>
+      </div>
+
+      <div class="fade-up mt-20 flex items-center justify-center gap-2 text-xs" style="color:var(--muted); animation-delay:.9s">
+        <span class="w-12 h-px" style="background:var(--accent)"></span>
+        <span class="font-display tracking-widest">SCROLL TO DESCEND</span>
+        <span class="w-12 h-px" style="background:var(--accent)"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 世界观列表 -->
+  <div id="worlds-list" class="relative max-w-7xl mx-auto px-6 py-24 z-10">
+    <div class="text-center mb-20 fade-up">
+      <div class="font-display text-xs tracking-[0.5em] mb-4" style="color:var(--accent)">— THE ARCHIVE —</div>
+      <h2 class="font-serif-sc font-black text-4xl md:text-6xl mb-4">世界卷宗</h2>
+      <p class="max-w-xl mx-auto" style="color:var(--muted)">每一卷即一界。点选进入，可见其纪元、人物与派系之全貌。</p>
+    </div>
+    <div id="worlds-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 stagger">
+      <!-- 由 JS 渲染 -->
+    </div>
+  </div>
+
+  <!-- 页脚 -->
+  <footer class="relative z-10 border-t mt-20" style="border-color:var(--border)">
+    <div class="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row items-center justify-between gap-4 text-sm" style="color:var(--muted)">
+      <div class="font-display tracking-widest">© AETHERIUM CODEX · MMXXV</div>
+      <div class="font-serif-sc">凡所记之事，皆为已发生之可能。</div>
+    </div>
+  </footer>
+</section>
+
+<!-- ============ 世界详情视图 ============ -->
+<section id="view-world" class="view">
+  <!-- 由 JS 渲染 -->
+</section>
+
+<!-- ============ Admin 视图 ============ -->
+<section id="view-admin" class="view">
+  <!-- 由 JS 渲染 -->
+</section>
+
+<!-- ============ 派系抽屉 ============ -->
+<div id="faction-backdrop"></div>
+<aside id="faction-drawer">
+  <div id="faction-drawer-content"></div>
+</aside>
+
+<!-- 过渡覆盖层 -->
+<div id="transition-overlay">
+  <div class="trans-pane" id="trans-pane"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container"></div>
+
+<script>
+/* ==========================================================
+   数据层：localStorage + 默认示例
+   ========================================================== */
+const STORE_KEY = 'aetherium_worlds_v1';
+const ADMIN_PASS = 'aether'; // 可自行修改
+const SESSION_KEY = 'aetherium_admin_session';
+
+const DEFAULT_DATA = {
+  worlds: [
+    {
+      id: 'w1',
+      title: '陨星纪',
+      subtitle: 'The Age of Falling Stars',
+      cover: 'https://picsum.photos/seed/aether-falling/1200/800',
+      color: '#e8b87d',
+      tagline: '当星辰陨落，神祇沉默，凡人于灰烬中重写秩序。',
+      background: '在天穹第三次崩裂之后，诸神之火熄灭于北境冰原。残存的人类与异族在破碎的大陆上重建文明，却发现陨石带来的并非仅是毁灭——星核之中沉睡着古老意志，等待被重新唤醒。三百年来，学者们拼凑着失落的星图，骑士团守护着尚未冷却的陨坑，而一些被星辉触碰过的人，开始听见来自虚空的低语。',
+      timeline: [
+        { year: '0 · 元年', event: '天穹崩裂', desc: '北境上空星辰骤落，神殿之火尽灭，史称「陨星之灾」。' },
+        { year: '47', event: '灰烬盟约', desc: '残存城邦于废墟之上签订盟约，共组「灰烬议会」以维系秩序。' },
+        { year: '102', event: '星核初醒', desc: '南方矿工在陨坑深处发掘出会脉动的晶体，学者命名为「星核」。' },
+        { year: '156', event: '裂痕之乱', desc: '受星辉影响者自称「觉者」，与凡人之间爆发第一次大规模冲突。' },
+        { year: '203', event: '寒铁之誓', desc: '寒铁骑士团成立，誓言守护陨坑、防止星核意志外泄。' },
+        { year: '289', event: '虚空低语', desc: '觉者之中开始流传同一句话：『祂们尚未离去，只是沉睡。』' }
+      ],
+      characters: [
+        {
+          name: '艾瑟·维尔',
+          title: '寒铁骑士团 · 第九席',
+          avatar: 'https://picsum.photos/seed/char-aether/400/400',
+          desc: '出身于陨星之灾幸存的维尔家族，少年时亲眼目睹兄长被星核意志吞噬。她以钢铁意志克制住体内微弱的星辉回响，成为骑士团最年轻的第九席。',
+          stats: { '武艺': 92, '意志': 88, '智谋': 70, '魅力': 75, '神秘': 45, '信仰': 60 }
+        },
+        {
+          name: '塞拉芬·星语者',
+          title: '觉者议会 · 首席',
+          avatar: 'https://picsum.photos/seed/char-seraph/400/400',
+          desc: '出生于星核脉动最强之夜，自幼能听见虚空低语。她相信星核并非灾祸，而是沉睡神祇的馈赠，主张觉者应当主动接纳星辉。',
+          stats: { '武艺': 35, '意志': 80, '智谋': 95, '魅力': 88, '神秘': 98, '信仰': 90 }
+        },
+        {
+          name: '灰烬之主 · 莫兰',
+          title: '灰烬议会 · 终席执政',
+          avatar: 'https://picsum.photos/seed/char-moran/400/400',
+          desc: '执政长达六十年，亲历裂痕之乱。他的策略始终如一：维持平衡，避免任何一方势力独大。然而年事已高，他的判断开始被质疑。',
+          stats: { '武艺': 50, '意志': 85, '智谋': 92, '魅力': 78, '神秘': 55, '信仰': 40 }
+        }
+      ],
+      factions: [
+        {
+          name: '寒铁骑士团',
+          color: '#7a8a9a',
+          glyph: '✦',
+          philosophy: '镇守陨坑，隔绝星辉',
+          desc: '成立于寒铁之誓的当日，骑士团以特殊锻打的寒铁为甲，能够部分抵御星核意志的侵蚀。他们驻守于北境七大陨坑，世代相传，视「隔绝」为唯一信条。然而近年，越来越多的年轻骑士开始质疑：永久封印是否真的是唯一答案？',
+          motto: '铁为誓，寒为心，星辉不渡。'
+        },
+        {
+          name: '觉者议会',
+          color: '#c874e8',
+          glyph: '✸',
+          philosophy: '接纳星辉，唤醒神性',
+          desc: '由受星辉影响者组成的松散议会。他们视星核为沉睡神祇的馈赠，主张主动接纳而非隔绝。内部派系林立，温和派寻求与凡人共存，激进派则认为凡人时代终将落幕。',
+          motto: '低语即真理，星辉即未来。'
+        },
+        {
+          name: '灰烬议会',
+          color: '#e8b87d',
+          glyph: '◈',
+          philosophy: '维系平衡，延缓终局',
+          desc: '陨星之灾后由残存城邦组建的最高执政机构。议会由七十二席组成，每城邦依人口与贡献分配席位。其立场始终在骑士团与觉者之间摇摆，试图以平衡延缓不可避免的终局。',
+          motto: '于灰烬中，秩序重生。'
+        },
+        {
+          name: '星图学者会',
+          color: '#5ad6c8',
+          glyph: '✧',
+          philosophy: '考据真相，留存记忆',
+          desc: '不属任何一方的中立学术组织。他们收集陨星之灾前的星图残片，编纂「失落的苍穹」，试图还原神祇沉默的真相。其档案库位于海上孤岛，传闻藏有禁忌之卷。',
+          motto: '记忆不灭，星辰可读。'
+        }
+      ]
+    },
+    {
+      id: 'w2',
+      title: '青冥之上',
+      subtitle: 'Above the Azure Veil',
+      cover: 'https://picsum.photos/seed/aether-azure/1200/800',
+      color: '#5ad6c8',
+      tagline: '云海之上，浮岛列国，剑气纵横三千界。',
+      background: '青冥，是介于天与天之间的薄层。无数浮岛悬于云海之上，由上古「凝气者」以剑意维系不坠。千年以来，剑修们以剑意驭岛、以剑气通商、以剑决断纷争。然近百年，凝气者日渐稀少，浮岛开始缓缓下坠——青冥之下的「沉渊」，正张开巨口等待它们。',
+      timeline: [
+        { year: '上古', event: '凝气定岛', desc: '首位凝气者以一道剑意托起浮岛，奠定青冥文明之基。' },
+        { year: '甲子三百', event: '七岛会盟', desc: '七大浮岛剑宗签订「青冥之约」，共尊剑道。' },
+        { year: '甲子四百', event: '沉渊初现', desc: '云海之下首现异象，沉渊之主开始低语。' },
+        { year: '甲子五百', event: '凝气断绝', desc: '近百年再无新的凝气者诞生，浮岛下坠加速。' },
+        { year: '今', event: '末剑之议', desc: '七宗共议：是否以最后一位凝气者之命，重铸青冥。' }
+      ],
+      characters: [
+        {
+          name: '沈无锋',
+          title: '青冥最后 · 凝气者',
+          avatar: 'https://picsum.photos/seed/char-shen/400/400',
+          desc: '青冥百年来唯一觉醒剑意凝气之人。他知晓自己一旦殒落，浮岛将尽数坠入沉渊，故而活了八十年未敢拔剑。',
+          stats: { '武艺': 99, '意志': 95, '智谋': 80, '魅力': 70, '神秘': 88, '信仰': 50 }
+        },
+        {
+          name: '云栖',
+          title: '云隐宗 · 宗主',
+          avatar: 'https://picsum.photos/seed/char-yunqi/400/400',
+          desc: '主张以沈无锋之命重铸青冥。她是沈无锋的旧识，亦是唯一敢当面质问他的剑修。',
+          stats: { '武艺': 88, '意志': 90, '智谋': 85, '魅力': 82, '神秘': 60, '信仰': 75 }
+        }
+      ],
+      factions: [
+        {
+          name: '七岛剑宗',
+          color: '#5ad6c8',
+          glyph: '✦',
+          philosophy: '剑道即天理',
+          desc: '青冥七大浮岛的最高剑修宗门联盟，以剑道维系青冥秩序。',
+          motto: '一剑定岛，一意通天。'
+        },
+        {
+          name: '沉渊教',
+          color: '#8b3a8b',
+          glyph: '✸',
+          philosophy: '下坠即解脱',
+          desc: '信奉沉渊之主的地下教派，认为浮岛本应回归大地，青冥之上的存在是逆天而行。',
+          motto: '云海之下，方为归处。'
+        }
+      ]
+    }
+  ]
+};
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  saveData(DEFAULT_DATA);
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+function saveData(data){
+  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+}
+let DB = loadData();
+
+/* ==========================================================
+   工具函数
+   ========================================================== */
+function $(s, p=document){ return p.querySelector(s); }
+function $$(s, p=document){ return Array.from(p.querySelectorAll(s)); }
+function el(html){
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+function toast(msg){
+  const t = el(`<div class="toast">${msg}</div>`);
+  $('#toast-container').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(30px)'; t.style.transition='all .4s'; }, 2400);
+  setTimeout(()=> t.remove(), 3000);
+}
+function uid(){ return 'w' + Math.random().toString(36).slice(2,9); }
+
+/* ==========================================================
+   星空背景
+   ========================================================== */
+(function initStars(){
+  const cv = $('#stars');
+  const ctx = cv.getContext('2d');
+  let stars = [];
+  function resize(){
+    cv.width = innerWidth; cv.height = innerHeight;
+    stars = Array.from({length: Math.floor(innerWidth*innerHeight/9000)}, ()=>({
+      x: Math.random()*cv.width,
+      y: Math.random()*cv.height,
+      r: Math.random()*1.2 + 0.2,
+      a: Math.random()*0.6 + 0.2,
+      s: Math.random()*0.02 + 0.005,
+      ph: Math.random()*Math.PI*2
+    }));
+  }
+  resize();
+  addEventListener('resize', resize);
+  let t = 0;
+  function loop(){
+    t += 0.016;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(const s of stars){
+      const tw = s.a + Math.sin(t*2 + s.ph)*0.2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, Math.max(0.1, s.r), 0, Math.PI*2);
+      ctx.fillStyle = `rgba(232,184,125,${Math.max(0, tw)})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* ==========================================================
+   路由
+   ========================================================== */
+function showView(id){
+  $$('.view').forEach(v => v.classList.remove('active'));
+  $('#' + id).classList.add('active');
+  window.scrollTo({top:0, behavior:'instant'});
+}
+
+function route(){
+  const hash = location.hash.replace(/^#/, '') || '/';
+  if(hash.startsWith('/admin')){
+    showView('view-admin');
+    renderAdmin();
+  } else if(hash.startsWith('/world/')){
+    const id = hash.split('/')[2];
+    const w = DB.worlds.find(x => x.id === id);
+    if(w){
+      showView('view-world');
+      renderWorld(w);
+    } else {
+      location.hash = '#/';
+    }
+  } else {
+    showView('view-home');
+    renderHome();
+  }
+}
+addEventListener('hashchange', route);
+
+/* ==========================================================
+   主页渲染
+   ========================================================== */
+function renderHome(){
+  const grid = $('#worlds-grid');
+  if(!grid.children.length){
+    DB.worlds.forEach((w, i) => {
+      const card = el(`
+        <article class="world-card group" data-id="${w.id}">
+          <div class="cover aspect-[3/4] elev">
+            <img src="${w.cover}" alt="${w.title}" loading="lazy"/>
+            <span class="corner tl"></span><span class="corner tr"></span>
+            <span class="corner bl"></span><span class="corner br"></span>
+            <div class="absolute bottom-0 left-0 right-0 p-6 z-10">
+              <div class="font-display text-xs tracking-widest mb-2" style="color:${w.color}">${w.subtitle}</div>
+              <h3 class="font-serif-sc font-black text-3xl mb-3">${w.title}</h3>
+              <p class="text-sm leading-relaxed line-clamp-2" style="color:var(--muted)">${w.tagline}</p>
+              <div class="mt-4 flex items-center gap-2 text-xs font-display tracking-widest" style="color:${w.color}">
+                <span>ENTER</span>
+                <span class="w-8 h-px" style="background:${w.color}"></span>
+                <span>→</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      `);
+      card.addEventListener('click', e => triggerWorldTransition(w, card));
+      grid.appendChild(card);
+    });
+  }
+}
+
+/* ==========================================================
+   世界过渡动画：FLIP 风格 — 截取卡片位置 → 全屏覆盖 → 切换页面
+   ========================================================== */
+function triggerWorldTransition(world, cardEl){
+  const overlay = $('#transition-overlay');
+  const pane = $('#trans-pane');
+  const rect = cardEl.getBoundingClientRect();
+
+  // 用卡片的 cover 图片作为过渡面板背景
+  pane.style.backgroundImage = `url("${world.cover}")`;
+  pane.style.backgroundSize = 'cover';
+  pane.style.backgroundPosition = 'center';
+
+  // 起始：覆盖层就是卡片的位置与尺寸
+  pane.style.transform = `translate(${rect.left}px, ${rect.top}px) scale(${rect.width/window.innerWidth}, ${rect.height/window.innerHeight})`;
+  pane.style.opacity = '1';
+  overlay.classList.add('active');
+
+  // 强制 reflow
+  void pane.offsetWidth;
+
+  // 切换到全屏
+  pane.style.transition = 'transform .9s cubic-bezier(.7,0,.2,1), opacity .3s';
+  pane.style.transform = 'translate(0px, 0px) scale(1,1)';
+
+  // 同时让主页淡出
+  $('#view-home').style.transition = 'opacity .6s';
+  $('#view-home').style.opacity = '0';
+
+  setTimeout(()=>{
+    // 跳转
+    location.hash = '#/world/' + world.id;
+    // 渲染完后，让 overlay 淡出
+    setTimeout(()=>{
+      pane.style.transition = 'opacity .6s';
+      pane.style.opacity = '0';
+      $('#view-home').style.opacity = '1';
+      $('#view-home').style.transition = '';
+      setTimeout(()=> overlay.classList.remove('active'), 600);
+    }, 80);
+  }, 900);
+}
+
+/* ==========================================================
+   世界详情渲染
+   ========================================================== */
+let currentWorld = null;
+let radarChart = null;
+
+function renderWorld(w){
+  currentWorld = w;
+  document.title = `${w.title} · 苍穹编年史`;
+
+  const view = $('#view-world');
+  view.innerHTML = `
+    <!-- Hero -->
+    <div class="relative min-h-[80vh] flex items-end overflow-hidden">
+      <div class="absolute inset-0">
+        <img src="${w.cover}" class="w-full h-full object-cover" style="filter:saturate(0.9) brightness(0.55)"/>
+        <div class="absolute inset-0" style="background:linear-gradient(180deg, rgba(10,10,15,0.5) 0%, rgba(10,10,15,0.95) 90%)"></div>
+      </div>
+
+      <div class="ghost-text" style="top:30%; left:-3%; font-size:18vw; opacity:0.4">${w.title}</div>
+
+      <div class="relative z-10 max-w-7xl mx-auto w-full px-6 pb-16 pt-32">
+        <a href="#/" class="inline-flex items-center gap-2 text-sm mb-8 link-u" style="color:var(--muted)">
+          <span>←</span><span class="font-display tracking-widest">BACK TO ARCHIVE</span>
+        </a>
+        <div class="font-display text-sm tracking-[0.4em] mb-3 fade-up" style="color:${w.color}">${w.subtitle}</div>
+        <h1 class="font-serif-sc font-black text-6xl md:text-8xl mb-6 fade-up" style="animation-delay:.1s">${w.title}</h1>
+        <p class="text-xl md:text-2xl max-w-2xl font-serif-sc fade-up" style="color:var(--fg); animation-delay:.2s">${w.tagline}</p>
+      </div>
+    </div>
+
+    <!-- 子导航 -->
+    <div class="sticky top-[72px] z-40" style="background:rgba(10,10,15,0.85); backdrop-filter:blur(12px); border-bottom:1px solid var(--border)">
+      <div class="max-w-7xl mx-auto px-6 flex items-center gap-2 overflow-x-auto">
+        <button class="tab-btn active" data-tab="overview">OVERVIEW</button>
+        <button class="tab-btn" data-tab="timeline">TIMELINE</button>
+        <button class="tab-btn" data-tab="characters">CHARACTERS</button>
+        <button class="tab-btn" data-tab="factions">FACTIONS</button>
+      </div>
+    </div>
+
+    <!-- 内容区 -->
+    <div class="max-w-7xl mx-auto px-6 py-20">
+      <!-- Overview -->
+      <div id="tab-overview" class="tab-pane">
+        <div class="title-line mb-12">
+          <span class="font-display text-xs tracking-[0.5em]" style="color:var(--accent)">— BACKGROUND —</span>
+        </div>
+        <div class="grid lg:grid-cols-3 gap-12">
+          <div class="lg:col-span-2 fade-up">
+            <h2 class="font-serif-sc font-black text-4xl mb-8">背景纪略</h2>
+            <p class="text-lg leading-loose font-serif-sc" style="color:#d8d3c8">${w.background}</p>
+          </div>
+          <div class="fade-up" style="animation-delay:.2s">
+            <div class="border p-6" style="border-color:var(--border); background:rgba(20,18,28,0.4)">
+              <div class="font-display text-xs tracking-widest mb-4" style="color:var(--accent)">WORLD INDEX</div>
+              <dl class="space-y-3 text-sm">
+                <div class="flex justify-between border-b pb-2" style="border-color:var(--border)">
+                  <dt style="color:var(--muted)">纪元</dt><dd>${w.timeline.length ? w.timeline[0].year : '—'}</dd>
+                </div>
+                <div class="flex justify-between border-b pb-2" style="border-color:var(--border)">
+                  <dt style="color:var(--muted)">主要人物</dt><dd>${w.characters.length}</dd>
+                </div>
+                <div class="flex justify-between border-b pb-2" style="border-color:var(--border)">
+                  <dt style="color:var(--muted)">已知派系</dt><dd>${w.factions.length}</dd>
+                </div>
+                <div class="flex justify-between border-b pb-2" style="border-color:var(--border)">
+                  <dt style="color:var(--muted)">编年事件</dt><dd>${w.timeline.length}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div id="tab-timeline" class="tab-pane hidden">
+        <div class="title-line mb-12">
+          <span class="font-display text-xs tracking-[0.5em]" style="color:var(--accent)">— CHRONICLE —</span>
+        </div>
+        <h2 class="font-serif-sc font-black text-4xl mb-16 text-center">编年纪事</h2>
+        <div class="timeline-rail max-w-4xl mx-auto pb-8">
+          ${w.timeline.map((t, i) => `
+            <div class="tl-item mb-12" style="opacity:0; animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) both; animation-delay:${i*0.1}s">
+              <div class="tl-dot"></div>
+              <div class="grid grid-cols-2 gap-8">
+                <div class="tl-card text-right pr-8 ${i%2 ? 'opacity-0 pointer-events-none' : ''}">
+                  ${i%2===0 ? renderTimelineCard(t, w.color) : ''}
+                </div>
+                <div class="tl-card pl-8 ${i%2 ? '' : 'opacity-0 pointer-events-none'}">
+                  ${i%2===1 ? renderTimelineCard(t, w.color) : ''}
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Characters -->
+      <div id="tab-characters" class="tab-pane hidden">
+        <div class="title-line mb-12">
+          <span class="font-display text-xs tracking-[0.5em]" style="color:var(--accent)">— DRAMATIS PERSONAE —</span>
+        </div>
+        <h2 class="font-serif-sc font-black text-4xl mb-16 text-center">主要人物</h2>
+        <div class="grid lg:grid-cols-2 gap-12" id="characters-grid">
+          ${w.characters.map((c, i) => renderCharacterCard(c, w.color, i)).join('')}
+        </div>
+      </div>
+
+      <!-- Factions -->
+      <div id="tab-factions" class="tab-pane hidden">
+        <div class="title-line mb-12">
+          <span class="font-display text-xs tracking-[0.5em]" style="color:var(--accent)">— FACTIONS —</span>
+        </div>
+        <h2 class="font-serif-sc font-black text-4xl mb-16 text-center">主要派系</h2>
+        <div class="grid md:grid-cols-2 gap-6" id="factions-grid">
+          ${w.factions.map((f, i) => renderFactionCard(f, i)).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 绑定标签切换
+  $$('.tab-btn', view).forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.tab-btn', view).forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      $$('.tab-pane', view).forEach(p => p.classList.add('hidden'));
+      $('#tab-' + btn.dataset.tab, view).classList.remove('hidden');
+      // 触发动画
+      const pane = $('#tab-' + btn.dataset.tab, view);
+      pane.style.animation = 'none';
+      void pane.offsetWidth;
+      pane.style.animation = 'fadeIn .6s ease both';
+
+      // 如果切到角色页，初始化雷达图
+      if(btn.dataset.tab === 'characters') initRadarCharts(w);
+    });
+  });
+
+  // 绑定派系卡片点击
+  $$('.faction-card', view).forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = +card.dataset.idx;
+      openFactionDrawer(w.factions[idx]);
+    });
+  });
+
+  // 默认进入时若已切到角色页才初始化雷达图，主页进来时是 overview，所以不需要立即初始化
+  // 但为了让 radar 在第一次切到时正常，我们在切换时初始化
+
+  // 派系抽屉关闭
+  $('#faction-backdrop').addEventListener('click', closeFactionDrawer);
+}
+
+function renderTimelineCard(t, color){
+  return `
+    <div class="inline-block max-w-md p-5 elev" style="background:rgba(20,18,28,0.6); border:1px solid var(--border); border-left:2px solid ${color}">
+      <div class="font-display text-xs tracking-widest mb-1" style="color:${color}">${t.year}</div>
+      <h4 class="font-serif-sc font-bold text-xl mb-2">${t.event}</h4>
+      <p class="text-sm leading-relaxed" style="color:var(--muted)">${t.desc}</p>
+    </div>
+  `;
+}
+
+function renderCharacterCard(c, color, i){
+  return `
+    <div class="char-card p-8 elev" style="background:rgba(20,18,28,0.5); animation:fadeUp .8s both; animation-delay:${i*0.15}s">
+      <div class="flex gap-6 mb-6">
+        <div class="char-avatar w-24 h-24 flex-shrink-0 border" style="border-color:var(--border)">
+          <img src="${c.avatar}" class="w-full h-full object-cover"/>
+        </div>
+        <div>
+          <h3 class="font-serif-sc font-black text-2xl mb-1">${c.name}</h3>
+          <div class="font-display text-xs tracking-widest" style="color:${color}">${c.title}</div>
+        </div>
+      </div>
+      <p class="text-sm leading-relaxed mb-6" style="color:#c8c3b8">${c.desc}</p>
+      <div class="radar-wrap" style="max-width:320px; margin:0 auto">
+        <canvas class="radar-canvas" data-stats='${JSON.stringify(c.stats)}' data-color="${color}"></canvas>
+      </div>
+    </div>
+  `;
+}
+
+function renderFactionCard(f, i){
+  return `
+    <div class="faction-card p-8 elev" data-idx="${i}" style="--fc:${f.color}; background:rgba(20,18,28,0.5); animation:fadeUp .8s both; animation-delay:${i*0.1}s">
+      <div class="flex items-start justify-between mb-6 relative z-10">
+        <div>
+          <div class="glyph text-5xl mb-3" style="color:${f.color}">${f.glyph}</div>
+          <h3 class="font-serif-sc font-black text-2xl mb-1">${f.name}</h3>
+          <div class="text-xs font-display tracking-widest" style="color:${f.color}">${f.philosophy}</div>
+        </div>
+      </div>
+      <p class="text-sm leading-relaxed line-clamp-3 relative z-10" style="color:var(--muted)">${f.desc}</p>
+      <div class="mt-6 pt-4 border-t flex items-center justify-between relative z-10" style="border-color:var(--border)">
+        <span class="font-serif-sc text-sm italic" style="color:${f.color}">「${f.motto}」</span>
+        <span class="font-display text-xs tracking-widest" style="color:${f.color}">VIEW →</span>
+      </div>
+    </div>
+  `;
+}
+
+/* 雷达图初始化 */
+function initRadarCharts(w){
+  if(radarChart){ (Array.isArray(radarChart) ? radarChart : [radarChart]).forEach(c => c.destroy && c.destroy()); }
+  radarChart = [];
+  $$('.radar-canvas').forEach(cv => {
+    const stats = JSON.parse(cv.dataset.stats);
+    const color = cv.dataset.color;
+    const labels = Object.keys(stats);
+    const data = Object.values(stats);
+    const chart = new Chart(cv, {
+      type: 'radar',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: color + '33',
+          borderColor: color,
+          borderWidth: 2,
+          pointBackgroundColor: color,
+          pointBorderColor: '#0a0a0f',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: 'rgba(10,10,15,0.95)',
+          borderColor: color, borderWidth: 1, titleColor: color,
+          bodyColor: '#f5f0e8', padding: 12, displayColors: false
+        } },
+        scales: {
+          r: {
+            min: 0, max: 100,
+            ticks: { display: false, stepSize: 20 },
+            grid: { color: 'rgba(232,184,125,0.1)' },
+            angleLines: { color: 'rgba(232,184,125,0.15)' },
+            pointLabels: {
+              color: '#c8c3b8',
+              font: { family: 'Noto Serif SC', size: 12, weight: '600' }
+            }
           }
-        })
+        }
       }
-    <\/script>
-    <meta name="theme-color" content="#0B1A2B" />
-    <title>Arcanum · 世界观档案馆</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,600&family=Noto+Serif+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"><\/script>
-  </body>
+    });
+    radarChart.push(chart);
+  });
+}
+
+/* 派系抽屉 */
+function openFactionDrawer(f){
+  const c = $('#faction-drawer-content');
+  c.innerHTML = `
+    <div class="relative h-64 overflow-hidden" style="background:linear-gradient(135deg, ${f.color}33, transparent)">
+      <div class="absolute inset-0 flex items-center justify-center">
+        <div class="text-9xl" style="color:${f.color}; opacity:0.5; animation:rotate 30s linear infinite">${f.glyph}</div>
+      </div>
+      <button class="absolute top-4 right-4 w-10 h-10 flex items-center justify-center border" id="close-faction" style="border-color:var(--border); color:var(--muted)">✕</button>
+    </div>
+    <div class="p-8" style="animation:fadeUp .6s both">
+      <div class="font-display text-xs tracking-widest mb-2" style="color:${f.color}">${f.philosophy}</div>
+      <h2 class="font-serif-sc font-black text-4xl mb-6">${f.name}</h2>
+      <div class="border-l-2 pl-4 mb-8" style="border-color:${f.color}">
+        <p class="font-serif-sc italic text-lg" style="color:${f.color}">「${f.motto}」</p>
+      </div>
+      <p class="leading-loose font-serif-sc" style="color:#d8d3c8">${f.desc}</p>
+      <div class="mt-12 pt-8 border-t" style="border-color:var(--border)">
+        <div class="font-display text-xs tracking-widest mb-3" style="color:var(--muted)">FACTION SIGIL</div>
+        <div class="flex items-center gap-4">
+          <span class="text-4xl" style="color:${f.color}">${f.glyph}</span>
+          <span class="text-sm" style="color:var(--muted)">派系印记 · 代表其核心理念</span>
+        </div>
+      </div>
+    </div>
+  `;
+  $('#faction-drawer').classList.add('open');
+  $('#faction-backdrop').classList.add('open');
+  $('#close-faction').addEventListener('click', closeFactionDrawer);
+}
+function closeFactionDrawer(){
+  $('#faction-drawer').classList.remove('open');
+  $('#faction-backdrop').classList.remove('open');
+}
+
+/* ==========================================================
+   Admin 后台
+   ========================================================== */
+function renderAdmin(){
+  // 鉴权
+  if(sessionStorage.getItem(SESSION_KEY) !== '1'){
+    $('#view-admin').innerHTML = `
+      <div class="min-h-screen flex items-center justify-center px-6 pt-20">
+        <div class="w-full max-w-md fade-up">
+          <div class="text-center mb-10">
+            <svg width="60" height="60" viewBox="0 0 40 40" fill="none" class="mx-auto mb-6" style="animation:float 4s ease-in-out infinite">
+              <circle cx="20" cy="20" r="18" stroke="#e8b87d" stroke-width="1"/>
+              <circle cx="20" cy="20" r="10" stroke="#e8b87d" stroke-width="1" opacity="0.6"/>
+              <circle cx="20" cy="20" r="2" fill="#e8b87d"/>
+            </svg>
+            <h2 class="font-serif-sc font-black text-3xl mb-2">编者禁阁</h2>
+            <p class="text-sm" style="color:var(--muted)">仅受命者可入</p>
+          </div>
+          <form id="login-form" class="space-y-4">
+            <input type="password" class="field" placeholder="通行密语" id="login-pass" autofocus/>
+            <button type="submit" class="btn-primary w-full"><span>入阁</span></button>
+          </form>
+          <p class="text-xs text-center mt-6" style="color:var(--muted)">默认密语：aether（部署后请修改源码）</p>
+        </div>
+      </div>
+    `;
+    $('#login-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const v = $('#login-pass').value.trim();
+      if(v === ADMIN_PASS){
+        sessionStorage.setItem(SESSION_KEY, '1');
+        renderAdmin();
+        toast('入阁成功');
+      } else {
+        toast('密语有误');
+      }
+    });
+    return;
+  }
+
+  $('#view-admin').innerHTML = `
+    <div class="pt-24 pb-12">
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <div class="font-display text-xs tracking-[0.4em] mb-1" style="color:var(--accent)">— ADMIN CONSOLE —</div>
+            <h1 class="font-serif-sc font-black text-4xl">编者之桌</h1>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button class="btn-ghost" id="btn-export">导出 JSON</button>
+            <label class="btn-ghost cursor-pointer">
+              导入 JSON
+              <input type="file" accept="application/json" id="import-file" class="hidden"/>
+            </label>
+            <button class="btn-ghost" id="btn-logout">登出</button>
+          </div>
+        </div>
+
+        <!-- 世界选择器 -->
+        <div class="border p-4 mb-8" style="border-color:var(--border); background:rgba(20,18,28,0.4)">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="font-display text-xs tracking-widest" style="color:var(--muted)">EDITING:</span>
+            <select id="world-select" class="field max-w-xs"></select>
+            <button class="btn-ghost" id="btn-new-world">+ 新建世界</button>
+            <button class="btn-ghost" id="btn-del-world" style="color:#c87474; border-color:rgba(200,116,116,0.3)">删除当前世界</button>
+          </div>
+        </div>
+
+        <!-- 编辑区 -->
+        <div id="admin-editor"></div>
+      </div>
+    </div>
+  `;
+
+  // 填充世界下拉
+  const sel = $('#world-select');
+  DB.worlds.forEach(w => {
+    sel.appendChild(el(`<option value="${w.id}">${w.title} · ${w.subtitle}</option>`));
+  });
+  sel.addEventListener('change', () => renderAdminEditor(sel.value));
+  $('#btn-new-world').addEventListener('click', () => {
+    const w = {
+      id: uid(),
+      title: '新世界',
+      subtitle: 'New World',
+      cover: 'https://picsum.photos/seed/' + Math.random() + '/1200/800',
+      color: '#e8b87d',
+      tagline: '一句话简介',
+      background: '背景描述……',
+      timeline: [],
+      characters: [],
+      factions: []
+    };
+    DB.worlds.push(w);
+    saveData(DB);
+    toast('已新建');
+    renderAdmin();
+    $('#world-select').value = w.id;
+    renderAdminEditor(w.id);
+  });
+  $('#btn-del-world').addEventListener('click', () => {
+    if(DB.worlds.length <= 1){ toast('至少需保留一个世界'); return; }
+    const id = sel.value;
+    DB.worlds = DB.worlds.filter(w => w.id !== id);
+    saveData(DB);
+    toast('已删除');
+    renderAdmin();
+  });
+  $('#btn-export').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(DB, null, 2)], {type:'application/json'});
+    const a = el(`<a href="${URL.createObjectURL(blob)}" download="aetherium-worlds.json"></a>`);
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('已导出');
+  });
+  $('#import-file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try{
+        const d = JSON.parse(r.result);
+        if(d.worlds){ DB = d; saveData(DB); toast('导入成功'); renderAdmin(); }
+        else toast('格式不正确');
+      }catch(err){ toast('解析失败'); }
+    };
+    r.readAsText(f);
+  });
+  $('#btn-logout').addEventListener('click', () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    renderAdmin();
+    toast('已登出');
+  });
+
+  renderAdminEditor(sel.value);
+}
+
+function renderAdminEditor(worldId){
+  const w = DB.worlds.find(x => x.id === worldId);
+  if(!w) return;
+  const ed = $('#admin-editor');
+
+  ed.innerHTML = `
+    <!-- 基础信息 -->
+    <div class="border p-6 mb-6" style="border-color:var(--border); background:rgba(20,18,28,0.4)">
+      <h3 class="font-display tracking-widest text-sm mb-4" style="color:var(--accent)">— 基本信息 —</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div><label class="text-xs" style="color:var(--muted)">标题</label><input class="field mt-1" data-f="title" value="${w.title}"/></div>
+        <div><label class="text-xs" style="color:var(--muted)">副标题</label><input class="field mt-1" data-f="subtitle" value="${w.subtitle}"/></div>
+        <div><label class="text-xs" style="color:var(--muted)">封面图 URL</label><input class="field mt-1" data-f="cover" value="${w.cover}"/></div>
+        <div><label class="text-xs" style="color:var(--muted)">主题色 (HEX)</label><input class="field mt-1" data-f="color" value="${w.color}" type="color" style="height:42px; padding:4px"/></div>
+        <div class="md:col-span-2"><label class="text-xs" style="color:var(--muted)">一句话简介</label><input class="field mt-1" data-f="tagline" value="${w.tagline}"/></div>
+        <div class="md:col-span-2"><label class="text-xs" style="color:var(--muted)">背景介绍</label><textarea class="field mt-1" data-f="background" rows="5">${w.background}</textarea></div>
+      </div>
+    </div>
+
+    <!-- 时间线 -->
+    <div class="border p-6 mb-6" style="border-color:var(--border); background:rgba(20,18,28,0.4)">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display tracking-widest text-sm" style="color:var(--accent)">— 时间线 —</h3>
+        <button class="btn-ghost text-xs" data-add="timeline">+ 添加事件</button>
+      </div>
+      <div id="tl-list" class="space-y-3"></div>
+    </div>
+
+    <!-- 人物 -->
+    <div class="border p-6 mb-6" style="border-color:var(--border); background:rgba(20,18,28,0.4)">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display tracking-widest text-sm" style="color:var(--accent)">— 主要人物 —</h3>
+        <button class="btn-ghost text-xs" data-add="characters">+ 添加人物</button>
+      </div>
+      <div id="char-list" class="space-y-6"></div>
+    </div>
+
+    <!-- 派系 -->
+    <div class="border p-6 mb-6" style="border-color:var(--border); background:rgba(20,18,28,0.4)">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-display tracking-widest text-sm" style="color:var(--accent)">— 派系 —</h3>
+        <button class="btn-ghost text-xs" data-add="factions">+ 添加派系</button>
+      </div>
+      <div id="fac-list" class="space-y-6"></div>
+    </div>
+
+    <div class="sticky bottom-4 flex justify-end gap-3">
+      <button class="btn-ghost" id="btn-cancel">放弃</button>
+      <button class="btn-primary" id="btn-save"><span>保存全部修改</span></button>
+    </div>
+  `;
+
+  // 渲染时间线
+  function renderTl(){
+    const list = $('#tl-list');
+    list.innerHTML = '';
+    w.timeline.forEach((t, i) => {
+      const row = el(`
+        <div class="grid grid-cols-1 md:grid-cols-[120px_180px_1fr_auto] gap-2 items-start border-l-2 pl-3" style="border-color:${w.color}">
+          <input class="field" data-tl="year" data-i="${i}" value="${t.year}" placeholder="纪元"/>
+          <input class="field" data-tl="event" data-i="${i}" value="${t.event}" placeholder="事件名"/>
+          <textarea class="field" data-tl="desc" data-i="${i}" placeholder="描述" rows="2">${t.desc}</textarea>
+          <button class="btn-ghost text-xs" data-del-tl="${i}">删</button>
+        </div>
+      `);
+      list.appendChild(row);
+    });
+    list.querySelectorAll('[data-del-tl]').forEach(b => {
+      b.addEventListener('click', () => {
+        w.timeline.splice(+b.dataset.delTl, 1);
+        renderTl();
+      });
+    });
+  }
+  renderTl();
+
+  // 渲染人物
+  function renderChar(){
+    const list = $('#char-list');
+    list.innerHTML = '';
+    w.characters.forEach((c, i) => {
+      const stats = c.stats || {};
+      const statKeys = ['武艺','意志','智谋','魅力','神秘','信仰'];
+      const row = el(`
+        <div class="border p-4" style="border-color:var(--border)">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-serif-sc font-bold">人物 #${i+1}</span>
+            <button class="btn-ghost text-xs" data-del-char="${i}">删除</button>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div><label class="text-xs" style="color:var(--muted)">姓名</label><input class="field mt-1" data-char="name" data-i="${i}" value="${c.name}"/></div>
+            <div><label class="text-xs" style="color:var(--muted)">头衔</label><input class="field mt-1" data-char="title" data-i="${i}" value="${c.title}"/></div>
+            <div class="md:col-span-2"><label class="text-xs" style="color:var(--muted)">头像 URL</label><input class="field mt-1" data-char="avatar" data-i="${i}" value="${c.avatar}"/></div>
+            <div class="md:col-span-2"><label class="text-xs" style="color:var(--muted)">描述</label><textarea class="field mt-1" data-char="desc" data-i="${i}" rows="3">${c.desc}</textarea></div>
+          </div>
+          <div class="mt-3">
+            <div class="text-xs mb-2" style="color:var(--muted)">能力雷达 (0-100)：</div>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+              ${statKeys.map(k => `
+                <label class="flex items-center gap-2 text-xs">
+                  <span class="w-10" style="color:var(--muted)">${k}</span>
+                  <input type="range" min="0" max="100" value="${stats[k] ?? 50}" data-char-stat="${k}" data-i="${i}" class="flex-1" style="accent-color:${w.color}"/>
+                  <span class="w-8 text-right" data-stat-val="${k}" data-i="${i}">${stats[k] ?? 50}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `);
+      list.appendChild(row);
+    });
+    list.querySelectorAll('[data-del-char]').forEach(b => {
+      b.addEventListener('click', () => { w.characters.splice(+b.dataset.delChar, 1); renderChar(); });
+    });
+    list.querySelectorAll('[data-char-stat]').forEach(r => {
+      r.addEventListener('input', () => {
+        list.querySelector(`[data-stat-val="${r.dataset.charStat}"][data-i="${r.dataset.i}"]`).textContent = r.value;
+      });
+    });
+  }
+  renderChar();
+
+  // 渲染派系
+  function renderFac(){
+    const list = $('#fac-list');
+    list.innerHTML = '';
+    w.factions.forEach((f, i) => {
+      const row = el(`
+        <div class="border p-4" style="border-color:var(--border)">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-serif-sc font-bold">派系 #${i+1}</span>
+            <button class="btn-ghost text-xs" data-del-fac="${i}">删除</button>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div><label class="text-xs" style="color:var(--muted)">名称</label><input class="field mt-1" data-fac="name" data-i="${i}" value="${f.name}"/></div>
+            <div><label class="text-xs" style="color:var(--muted)">理念</label><input class="field mt-1" data-fac="philosophy" data-i="${i}" value="${f.philosophy}"/></div>
+            <div><label class="text-xs" style="color:var(--muted)">印记符号</label><input class="field mt-1" data-fac="glyph" data-i="${i}" value="${f.glyph}" maxlength="2"/></div>
+            <div><label class="text-xs" style="color:var(--muted)">颜色</label><input class="field mt-1" data-fac="color" data-i="${i}" value="${f.color}" type="color" style="height:42px; padding:4px"/></div>
+            <div class="md:col-span-2"><label class="text-xs" style="color:var(--muted)">格言</label><input class="field mt-1" data-fac="motto" data-i="${i}" value="${f.motto}"/></div>
+            <div class="md:col-span-2"><label class="text-xs" style="color:var(--muted)">描述</label><textarea class="field mt-1" data-fac="desc" data-i="${i}" rows="3">${f.desc}</textarea></div>
+          </div>
+        </div>
+      `);
+      list.appendChild(row);
+    });
+    list.querySelectorAll('[data-del-fac]').forEach(b => {
+      b.addEventListener('click', () => { w.factions.splice(+b.dataset.delFac, 1); renderFac(); });
+    });
+  }
+  renderFac();
+
+  // 添加按钮
+  ed.querySelectorAll('[data-add]').forEach(b => {
+    b.addEventListener('click', () => {
+      const t = b.dataset.add;
+      if(t === 'timeline') w.timeline.push({ year:'新纪元', event:'新事件', desc:'描述' });
+      if(t === 'characters') w.characters.push({ name:'新人物', title:'头衔', avatar:'https://picsum.photos/seed/'+Math.random()+'/400/400', desc:'描述', stats:{武艺:50,意志:50,智谋:50,魅力:50,神秘:50,信仰:50} });
+      if(t === 'factions') w.factions.push({ name:'新派系', philosophy:'理念', glyph:'✦', color:'#e8b87d', motto:'格言', desc:'描述' });
+      renderTl(); renderChar(); renderFac();
+    });
+  });
+
+  // 保存
+  $('#btn-save').addEventListener('click', () => {
+    // 基础信息
+    ed.querySelectorAll('[data-f]').forEach(inp => { w[inp.dataset.f] = inp.value; });
+    // 时间线
+    ed.querySelectorAll('[data-tl]').forEach(inp => {
+      const i = +inp.dataset.i;
+      w.timeline[i][inp.dataset.tl] = inp.value;
+    });
+    // 人物
+    ed.querySelectorAll('[data-char]').forEach(inp => {
+      const i = +inp.dataset.i;
+      w.characters[i][inp.dataset.char] = inp.value;
+    });
+    ed.querySelectorAll('[data-char-stat]').forEach(r => {
+      const i = +r.dataset.i;
+      if(!w.characters[i].stats) w.characters[i].stats = {};
+      w.characters[i].stats[r.dataset.charStat] = +r.value;
+    });
+    // 派系
+    ed.querySelectorAll('[data-fac]').forEach(inp => {
+      const i = +inp.dataset.i;
+      w.factions[i][inp.dataset.fac] = inp.value;
+    });
+
+    saveData(DB);
+    toast('已保存到本地');
+    // 刷新主页缓存
+    $('#worlds-grid').innerHTML = '';
+    // 刷新当前下拉显示
+    const sel = $('#world-select');
+    const opt = sel.querySelector(`option[value="${w.id}"]`);
+    if(opt) opt.textContent = `${w.title} · ${w.subtitle}`;
+  });
+
+  $('#btn-cancel').addEventListener('click', () => {
+    location.hash = '#/';
+  });
+}
+
+/* ==========================================================
+   初始化
+   ========================================================== */
+route();
+</script>
+</body>
 </html>
