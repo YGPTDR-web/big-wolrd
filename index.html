@@ -372,16 +372,15 @@
 
 <script>
 /* ==========================================================
-   云居 API 数据存储配置区
+   云居 API 配置区
+   ⚠️ 请填入你的云居账号和APPID，首次创建后填入文档ID
    ========================================================== */
-const YJ_USER      = '2807078381';        // 云居后台账号
-const YJ_APPID     = '';        // API应用APPID
-const YJ_DOC_TITLE = 'aetherium_db';            // 固定文档标题，别改
-let  YJ_DOC_ID     = '';                        // 文档ID：首次创建后填回这里
-let  YJ_PASS       = '';                        // 运行时从登录框获取，不写死
+const YJ_USER      = '这里替换为你的云居后台账号';   // 你的云居后台账号
+const YJ_APPID     = '这里替换为你的API应用APPID';   // 你的API应用APPID
+const YJ_DOC_TITLE = 'aetherium_db';                // 固定文档标题，别改
+let  YJ_DOC_ID     = '';                            // 文档ID：首次创建后填回这里
+let  YJ_PASS       = '';                            // 运行时从登录框获取
 const YJ_API       = 'https://yuju.99kpk.top:81/api';
-
-let GITHUB_TOKEN = ''; // 运行时从登录框获取，不会写死在代码里
 
 /* ==========================================================
    数据层 & 默认数据
@@ -519,23 +518,26 @@ const DEFAULT_DATA = {
   ]
 };
 
-let CURRENT_SHA = null;
 let DB = null;
 
-// 1. 读取数据
-// 云居接口统一请求（用 form 格式，属于简单请求，避免触发预检）
+// 云居接口统一请求
 async function yjuRequest(action, params){
   const body = Object.entries(params)
     .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
-  const res = await fetch(`${YJ_API}/${action}.php`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body
-  });
-  return res.json();
+  try {
+    const res = await fetch(`${YJ_API}/${action}.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    return await res.json();
+  } catch(e) {
+    console.error('云居请求失败:', e);
+    return { code: -1, msg: '网络或跨域错误' };
+  }
 }
 
-// 读取数据（访客也可用，无需密码）
+// 1. 读取数据（访客也可用，无需密码）
 async function loadData(){
   const docId = YJ_DOC_ID || localStorage.getItem('yj_doc_id') || '';
   if(docId){
@@ -559,7 +561,7 @@ async function loadData(){
   return def;
 }
 
-// 保存数据（需要云居密码）
+// 2. 保存数据（需要云居密码）
 async function saveData(data){
   const content = JSON.stringify(data);
   localStorage.setItem(STORE_KEY, content);
@@ -577,17 +579,21 @@ async function saveData(data){
         title: YJ_DOC_TITLE, content
       });
       if(r.code !== 1){ toast('创建文档失败：' + r.msg); return; }
+      
       // 创建成功后，用列表接口拿到文档 ID
       const lr = await yjuRequest('file_obtain_list', {
         user: YJ_USER, pass: YJ_PASS, appid: YJ_APPID
       });
       if(lr.code === 1 && lr.list){
-        const found = lr.list.find(x => x.title === YJ_DOC_TITLE)
-                    || lr.list[lr.list.length - 1];
+        let listData = lr.list;
+        if(!Array.isArray(listData)) listData = [listData]; // 兼容单对象返回
+        const found = listData.find(x => x.title === YJ_DOC_TITLE) || listData[listData.length - 1];
         if(found){
           YJ_DOC_ID = found.id;
           localStorage.setItem('yj_doc_id', YJ_DOC_ID);
           toast('首次创建成功！文档ID：' + YJ_DOC_ID + '，请填回代码配置区');
+        } else {
+          toast('文档已创建，但未找到ID，请去云居后台查看');
         }
       }
     } else {
@@ -604,7 +610,6 @@ async function saveData(data){
     toast('保存失败，请按 F12 查看控制台报错');
   }
 }
-
 
 /* ==========================================================
    工具函数
@@ -1048,34 +1053,32 @@ function renderAdmin(){
             <h2 class="font-serif-sc font-black text-3xl mb-2">编者禁阁</h2>
             <p class="text-sm" style="color:var(--muted)">仅受命者可入</p>
           </div>
-<form id="login-form" class="space-y-4">
-  <input type="password" class="field" placeholder="通行密语 (默认: aether)" id="login-pass" autofocus/>
-  <input type="password" class="field" placeholder="云居后台密码 (用于读写数据)" id="login-pass-yju"/>
-  <button type="submit" class="btn-primary w-full"><span>入阁</span></button>
-</form>
-<p class="text-xs text-center mt-6" style="color:var(--muted)">密码仅存于当前浏览器，不会上传至代码库</p>
-
+          <form id="login-form" class="space-y-4">
+            <input type="password" class="field" placeholder="通行密语 (默认: aether)" id="login-pass" autofocus/>
+            <input type="password" class="field" placeholder="云居后台密码 (用于读写数据)" id="login-pass-yju"/>
+            <button type="submit" class="btn-primary w-full"><span>入阁</span></button>
+          </form>
+          <p class="text-xs text-center mt-6" style="color:var(--muted)">密码仅存于当前浏览器，不会上传至代码库</p>
         </div>
       </div>
     `;
     
     // 登录表单提交逻辑
     $('#login-form').addEventListener('submit', e => {
-  e.preventDefault();
-  const v = $('#login-pass').value.trim();
-  const yjPass = $('#login-pass-yju').value.trim();
-  if(v === ADMIN_PASS){
-    if(!yjPass){ toast('请输入云居后台密码'); return; }
-    YJ_PASS = yjPass;
-    sessionStorage.setItem(SESSION_KEY, '1');
-    sessionStorage.setItem('temp_pass', yjPass);
-    renderAdmin();
-    toast('入阁成功');
-  } else {
-    toast('密语有误');
-  }
-});
-
+      e.preventDefault();
+      const v = $('#login-pass').value.trim();
+      const yjPass = $('#login-pass-yju').value.trim();
+      if(v === ADMIN_PASS){
+        if(!yjPass){ toast('请输入云居后台密码'); return; }
+        YJ_PASS = yjPass;
+        sessionStorage.setItem(SESSION_KEY, '1');
+        sessionStorage.setItem('temp_pass', yjPass);
+        renderAdmin();
+        toast('入阁成功');
+      } else {
+        toast('密语有误');
+      }
+    });
     return;
   }
 
@@ -1141,13 +1144,12 @@ function renderAdmin(){
     renderAdmin();
   });
   $('#btn-logout').addEventListener('click', () => {
-  sessionStorage.removeItem(SESSION_KEY);
-  sessionStorage.removeItem('temp_pass');
-  YJ_PASS = '';
-  renderAdmin();
-  toast('已登出');
-});
-
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('temp_pass');
+    YJ_PASS = '';
+    renderAdmin();
+    toast('已登出');
+  });
 
   renderAdminEditor(sel.value);
 }
@@ -1326,8 +1328,8 @@ function renderAdminEditor(worldId){
       w.factions[i][inp.dataset.fac] = inp.value;
     });
 
-    await saveData(DB); // 推送到 GitHub
-    toast('已保存并同步到云端');
+    await saveData(DB); // 推送到云居
+    toast('正在保存...');
     
     const sel = $('#world-select');
     const opt = sel.querySelector(`option[value="${w.id}"]`);
@@ -1347,7 +1349,7 @@ if(cachedPass) YJ_PASS = cachedPass;
 
 loadData().then(data => {
   DB = data;
-  route();
+  route(); // 数据准备好了，才开始渲染页面
 });
 
 </script>
