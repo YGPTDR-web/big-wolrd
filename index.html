@@ -375,9 +375,11 @@
    GitHub API 云端数据库配置区
    ⚠️ 请将下面 4 个变量替换为你自己的信息！
    ========================================================== */
-const REPO_OWNER   = 'YGPTDR-web';      // 比如 zhangsan
-const REPO_NAME    = 'json-db';         // 比如 worldview-db
-const FILE_PATH    = 'db.json';                         // 仓庛建的文件名
+const REPO_OWNER   = 'YGPTDR-web';
+const REPO_NAME    = 'json-db';
+const FILE_PATH    = 'db.json';
+let GITHUB_TOKEN = ''; // 运行时从输入框获取，不硬编码在代码里
+
 
 /* ==========================================================
    数据层 & 默认数据
@@ -1015,6 +1017,7 @@ function closeFactionDrawer(){
    Admin 后台
    ========================================================== */
 function renderAdmin(){
+  // 如果未登录，显示登录界面
   if(sessionStorage.getItem(SESSION_KEY) !== '1'){
     $('#view-admin').innerHTML = `
       <div class="min-h-screen flex items-center justify-center px-6 pt-20">
@@ -1029,32 +1032,35 @@ function renderAdmin(){
             <p class="text-sm" style="color:var(--muted)">仅受命者可入</p>
           </div>
           <form id="login-form" class="space-y-4">
-            <input type="password" class="field" placeholder="通行密语" id="login-pass" autofocus/>
+            <input type="password" class="field" placeholder="通行密语 (默认: aether)" id="login-pass" autofocus/>
+            <input type="password" class="field" placeholder="GitHub Token (用于读写数据)" id="login-token"/>
             <button type="submit" class="btn-primary w-full"><span>入阁</span></button>
           </form>
-          <p class="text-xs text-center mt-6" style="color:var(--muted)">默认密语：aether</p>
+          <p class="text-xs text-center mt-6" style="color:var(--muted)">Token 仅存于当前浏览器，不会上传至代码库</p>
         </div>
       </div>
     `;
+    
+    // 登录表单提交逻辑
     $('#login-form').addEventListener('submit', e => {
       e.preventDefault();
       const v = $('#login-pass').value.trim();
-const token = $('#login-token').value.trim();
-if(v === ADMIN_PASS){
-  if(!token){ toast('请输入 GitHub Token'); return; }
-  GITHUB_TOKEN = token; // 将 Token 保存在内存中
-  sessionStorage.setItem(SESSION_KEY, '1');
-  sessionStorage.setItem('temp_token', token); // 临时存一下，刷新页面不丢失
-  renderAdmin();
-  toast('入阁成功');
-} else {
-  toast('密语有误');
-}
-
+      const token = $('#login-token').value.trim();
+      if(v === ADMIN_PASS){
+        if(!token){ toast('请输入 GitHub Token'); return; }
+        GITHUB_TOKEN = token; // 将 Token 保存在内存中
+        sessionStorage.setItem(SESSION_KEY, '1');
+        sessionStorage.setItem('temp_token', token); // 临时存一下，刷新页面不丢失
+        renderAdmin();
+        toast('入阁成功');
+      } else {
+        toast('密语有误');
+      }
     });
     return;
   }
 
+  // 以下是登录成功后的后台界面
   $('#view-admin').innerHTML = `
     <div class="pt-24 pb-12">
       <div class="max-w-7xl mx-auto px-6">
@@ -1117,6 +1123,8 @@ if(v === ADMIN_PASS){
   });
   $('#btn-logout').addEventListener('click', () => {
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('temp_token');
+    GITHUB_TOKEN = '';
     renderAdmin();
     toast('已登出');
   });
@@ -1311,16 +1319,15 @@ function renderAdminEditor(worldId){
   });
 }
 
-/* ==========================================================
-   初始化 (异步加载云端数据后渲染)
-   ========================================================== */
 // 尝试从临时缓存恢复 Token（防止刷新页面后失效）
 const cachedToken = sessionStorage.getItem('temp_token');
 if(cachedToken) GITHUB_TOKEN = cachedToken;
 
 loadData().then(data => {
   DB = data;
-  route();
+  route(); // 数据准备好了，才开始渲染页面
+});
+
 });
 
 </script>
