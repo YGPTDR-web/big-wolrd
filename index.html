@@ -372,12 +372,15 @@
 
 <script>
 /* ==========================================================
-   GitHub API 云端数据库配置区
-   ⚠️ 请填入你的用户名和仓库名，无需填入 Token (Token 在后台登录时输入)
+   云居 API 数据存储配置区
    ========================================================== */
-const REPO_OWNER   = '这里替换为你的GitHub用户名';     // 你的 GitHub 用户名
-const REPO_NAME    = '这里替换为你的数据仓库名';       // 你放 db.json 的公开仓库名
-const FILE_PATH    = 'db.json';                        // 仓庛建的文件名
+const YJ_USER      = '2807078381';        // 云居后台账号
+const YJ_APPID     = '';        // API应用APPID
+const YJ_DOC_TITLE = 'aetherium_db';            // 固定文档标题，别改
+let  YJ_DOC_ID     = '';                        // 文档ID：首次创建后填回这里
+let  YJ_PASS       = '';                        // 运行时从登录框获取，不写死
+const YJ_API       = 'https://yuju.99kpk.top:81/api';
+
 let GITHUB_TOKEN = ''; // 运行时从登录框获取，不会写死在代码里
 
 /* ==========================================================
@@ -520,81 +523,88 @@ let CURRENT_SHA = null;
 let DB = null;
 
 // 1. 读取数据
-async function loadData(){
-  try {
-    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-    const headers = { 'Accept': 'application/vnd.github.v3+json' };
-    // 如果有 Token (管理员已登录)，则带上 Token 避免读取频率限制
-    if (GITHUB_TOKEN) {
-      headers['Authorization'] = `token ${GITHUB_TOKEN}`;
-    }
-    
-    const res = await fetch(url, { headers });
-    if(res.ok) {
-      const json = await res.json();
-      CURRENT_SHA = json.sha; 
-      const decodedText = decodeURIComponent(escape(atob(json.content)));
-      const data = JSON.parse(decodedText);
-      
-      // 如果云端是空对象或没有 worlds 字段，初始化为默认数据并推回云端
-      if(!data.worlds) {
-        await saveData(DEFAULT_DATA);
-        return JSON.parse(JSON.stringify(DEFAULT_DATA));
-      }
-      
-      localStorage.setItem(STORE_KEY, decodedText);
-      return data;
-    }
-  } catch(e) {
-    console.warn('GitHub读取失败，读本地:', e);
-  }
-  try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if(raw) return JSON.parse(raw);
-  } catch(e){}
-  
-  // 如果都没有，用默认数据
-  await saveData(DEFAULT_DATA);
-  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+// 云居接口统一请求（用 form 格式，属于简单请求，避免触发预检）
+async function yjuRequest(action, params){
+  const body = Object.entries(params)
+    .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+  const res = await fetch(`${YJ_API}/${action}.php`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+  return res.json();
 }
 
-// 2. 保存数据
+// 读取数据（访客也可用，无需密码）
+async function loadData(){
+  const docId = YJ_DOC_ID || localStorage.getItem('yj_doc_id') || '';
+  if(docId){
+    YJ_DOC_ID = docId;
+    try {
+      const r = await yjuRequest('file_api_query', {
+        user: YJ_USER, appid: YJ_APPID, id: docId
+      });
+      if(r.code === 1 && r.content){
+        const data = JSON.parse(r.content);
+        if(data && data.worlds){
+          localStorage.setItem(STORE_KEY, r.content);
+          return data;
+        }
+      }
+    } catch(e) { console.warn('云居读取失败:', e); }
+  }
+  // 没有云端文档 → 用默认数据
+  const def = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  localStorage.setItem(STORE_KEY, JSON.stringify(def));
+  return def;
+}
+
+// 保存数据（需要云居密码）
 async function saveData(data){
-  localStorage.setItem(STORE_KEY, JSON.stringify(data));
-  
-  // 如果没有 Token，说明是普通访客，不执行推送到 GitHub
-  if (!GITHUB_TOKEN) {
-    console.warn('未检测到 Token，数据仅保存在本地浏览器。');
+  const content = JSON.stringify(data);
+  localStorage.setItem(STORE_KEY, content);
+
+  if(!YJ_PASS){
+    console.warn('未登录，数据仅保存在本地浏览器');
     return;
   }
-  
+
   try {
-    const encodedContent = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
-    const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        message: '后台更新数据',
-        content: encodedContent,
-        sha: CURRENT_SHA
-      })
-    });
-    if(res.ok) {
-      const json = await res.json();
-      CURRENT_SHA = json.content.sha;
-      console.log('自动保存到GitHub成功!');
+    if(!YJ_DOC_ID){
+      // 第一次：创建文档
+      const r = await yjuRequest('file_api_establish', {
+        user: YJ_USER, pass: YJ_PASS, appid: YJ_APPID,
+        title: YJ_DOC_TITLE, content
+      });
+      if(r.code !== 1){ toast('创建文档失败：' + r.msg); return; }
+      // 创建成功后，用列表接口拿到文档 ID
+      const lr = await yjuRequest('file_obtain_list', {
+        user: YJ_USER, pass: YJ_PASS, appid: YJ_APPID
+      });
+      if(lr.code === 1 && lr.list){
+        const found = lr.list.find(x => x.title === YJ_DOC_TITLE)
+                    || lr.list[lr.list.length - 1];
+        if(found){
+          YJ_DOC_ID = found.id;
+          localStorage.setItem('yj_doc_id', YJ_DOC_ID);
+          toast('首次创建成功！文档ID：' + YJ_DOC_ID + '，请填回代码配置区');
+        }
+      }
     } else {
-      console.warn('推送到 GitHub 失败:', await res.json());
+      // 已有文档：修改
+      const r = await yjuRequest('file_api_modify', {
+        user: YJ_USER, pass: YJ_PASS, appid: YJ_APPID,
+        id: YJ_DOC_ID, title: YJ_DOC_TITLE, content
+      });
+      if(r.code === 1){ toast('已保存并同步到云端'); }
+      else { toast('保存失败：' + r.msg); }
     }
-  } catch(e) {
-    console.warn('云端保存失败:', e);
+  } catch(e){
+    console.warn('云居保存失败:', e);
+    toast('保存失败，请按 F12 查看控制台报错');
   }
 }
+
 
 /* ==========================================================
    工具函数
@@ -1038,32 +1048,34 @@ function renderAdmin(){
             <h2 class="font-serif-sc font-black text-3xl mb-2">编者禁阁</h2>
             <p class="text-sm" style="color:var(--muted)">仅受命者可入</p>
           </div>
-          <form id="login-form" class="space-y-4">
-            <input type="password" class="field" placeholder="通行密语 (默认: aether)" id="login-pass" autofocus/>
-            <input type="password" class="field" placeholder="GitHub Token (用于读写数据)" id="login-token"/>
-            <button type="submit" class="btn-primary w-full"><span>入阁</span></button>
-          </form>
-          <p class="text-xs text-center mt-6" style="color:var(--muted)">Token 仅存于当前浏览器，不会上传至代码库</p>
+<form id="login-form" class="space-y-4">
+  <input type="password" class="field" placeholder="通行密语 (默认: aether)" id="login-pass" autofocus/>
+  <input type="password" class="field" placeholder="云居后台密码 (用于读写数据)" id="login-pass-yju"/>
+  <button type="submit" class="btn-primary w-full"><span>入阁</span></button>
+</form>
+<p class="text-xs text-center mt-6" style="color:var(--muted)">密码仅存于当前浏览器，不会上传至代码库</p>
+
         </div>
       </div>
     `;
     
     // 登录表单提交逻辑
     $('#login-form').addEventListener('submit', e => {
-      e.preventDefault();
-      const v = $('#login-pass').value.trim();
-      const token = $('#login-token').value.trim();
-      if(v === ADMIN_PASS){
-        if(!token){ toast('请输入 GitHub Token'); return; }
-        GITHUB_TOKEN = token; // 将 Token 保存在内存中
-        sessionStorage.setItem(SESSION_KEY, '1');
-        sessionStorage.setItem('temp_token', token); // 临时存一下，刷新页面不丢失
-        renderAdmin();
-        toast('入阁成功');
-      } else {
-        toast('密语有误');
-      }
-    });
+  e.preventDefault();
+  const v = $('#login-pass').value.trim();
+  const yjPass = $('#login-pass-yju').value.trim();
+  if(v === ADMIN_PASS){
+    if(!yjPass){ toast('请输入云居后台密码'); return; }
+    YJ_PASS = yjPass;
+    sessionStorage.setItem(SESSION_KEY, '1');
+    sessionStorage.setItem('temp_pass', yjPass);
+    renderAdmin();
+    toast('入阁成功');
+  } else {
+    toast('密语有误');
+  }
+});
+
     return;
   }
 
@@ -1129,12 +1141,13 @@ function renderAdmin(){
     renderAdmin();
   });
   $('#btn-logout').addEventListener('click', () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    sessionStorage.removeItem('temp_token');
-    GITHUB_TOKEN = '';
-    renderAdmin();
-    toast('已登出');
-  });
+  sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem('temp_pass');
+  YJ_PASS = '';
+  renderAdmin();
+  toast('已登出');
+});
+
 
   renderAdminEditor(sel.value);
 }
@@ -1329,13 +1342,12 @@ function renderAdminEditor(worldId){
 /* ==========================================================
    初始化 (异步加载云端数据后渲染)
    ========================================================== */
-// 尝试从临时缓存恢复 Token（防止刷新页面后失效）
-const cachedToken = sessionStorage.getItem('temp_token');
-if(cachedToken) GITHUB_TOKEN = cachedToken;
+const cachedPass = sessionStorage.getItem('temp_pass');
+if(cachedPass) YJ_PASS = cachedPass;
 
 loadData().then(data => {
   DB = data;
-  route(); // 数据准备好了，才开始渲染页面
+  route();
 });
 
 </script>
