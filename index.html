@@ -1200,12 +1200,14 @@ function renderAdminEditor(worldId){
     });
     list.querySelectorAll('[data-del-tl]').forEach(b => {
       b.addEventListener('click', () => {
+        syncAllData(); // <--- 新增：删除前先同步数据
         w.timeline.splice(+b.dataset.delTl, 1);
         renderTl();
       });
     });
   }
   renderTl();
+
 
   function renderChar(){
     const list = $('#char-list');
@@ -1242,8 +1244,9 @@ function renderAdminEditor(worldId){
       list.appendChild(row);
     });
     list.querySelectorAll('[data-del-char]').forEach(b => {
-      b.addEventListener('click', () => { w.characters.splice(+b.dataset.delChar, 1); renderChar(); });
+      b.addEventListener('click', () => { syncAllData(); w.characters.splice(+b.dataset.delChar, 1); renderChar(); });
     });
+
     list.querySelectorAll('[data-char-stat]').forEach(r => {
       r.addEventListener('input', () => {
         list.querySelector(`[data-stat-val="${r.dataset.charStat}"][data-i="${r.dataset.i}"]`).textContent = r.value;
@@ -1275,13 +1278,41 @@ function renderAdminEditor(worldId){
       list.appendChild(row);
     });
     list.querySelectorAll('[data-del-fac]').forEach(b => {
-      b.addEventListener('click', () => { w.factions.splice(+b.dataset.delFac, 1); renderFac(); });
+      b.addEventListener('click', () => { syncAllData(); w.factions.splice(+b.dataset.delFac, 1); renderFac(); });
     });
+
   }
   renderFac();
 
+  // 新增：同步当前界面所有输入框的数据到内存中
+  function syncAllData() {
+    // 同步时间线
+    $('#tl-list').querySelectorAll('[data-tl]').forEach(inp => {
+      const i = +inp.dataset.i;
+      if(w.timeline[i]) w.timeline[i][inp.dataset.tl] = inp.value;
+    });
+    // 同步人物
+    $('#char-list').querySelectorAll('[data-char]').forEach(inp => {
+      const i = +inp.dataset.i;
+      if(w.characters[i]) w.characters[i][inp.dataset.char] = inp.value;
+    });
+    $('#char-list').querySelectorAll('[data-char-stat]').forEach(r => {
+      const i = +r.dataset.i;
+      if(w.characters[i]) {
+        if(!w.characters[i].stats) w.characters[i].stats = {};
+        w.characters[i].stats[r.dataset.charStat] = +r.value;
+      }
+    });
+    // 同步派系
+    $('#fac-list').querySelectorAll('[data-fac]').forEach(inp => {
+      const i = +inp.dataset.i;
+      if(w.factions[i]) w.factions[i][inp.dataset.fac] = inp.value;
+    });
+  }
+
   ed.querySelectorAll('[data-add]').forEach(b => {
     b.addEventListener('click', () => {
+      syncAllData(); // <--- 新增：添加前先同步数据
       const t = b.dataset.add;
       if(t === 'timeline') w.timeline.push({ year:'新纪元', event:'新事件', desc:'描述' });
       if(t === 'characters') w.characters.push({ name:'新人物', title:'头衔', avatar:'https://picsum.photos/seed/'+Math.random()+'/400/400', desc:'描述', stats:{武艺:50,意志:50,智谋:50,魅力:50,神秘:50,信仰:50} });
@@ -1289,6 +1320,7 @@ function renderAdminEditor(worldId){
       renderTl(); renderChar(); renderFac();
     });
   });
+
 
   $('#btn-save').addEventListener('click', async () => {
     ed.querySelectorAll('[data-f]').forEach(inp => { w[inp.dataset.f] = inp.value; });
